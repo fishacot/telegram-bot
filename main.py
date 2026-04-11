@@ -106,10 +106,13 @@ async def texts(message: types.Message):
         resize_keyboard=True
     )
 
-    await message.answer("Выберите раздел")
+    await message.answer("Выберите раздел", reply_markup=kb)
 
 @dp.message(F.text == "🖼 Фото")
 async def photos(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
     kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="start_photo")],
@@ -122,7 +125,7 @@ async def photos(message: types.Message):
         resize_keyboard=True
     )
 
-    await message.answer("Выберите раздел")
+    await message.answer("Выберите раздел", reply_markup=kb)
 
 @dp.message(F.text == "🛒 Маркет объявлений")
 async def market(message: types.Message):
@@ -259,3 +262,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
