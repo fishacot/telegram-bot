@@ -116,7 +116,18 @@ async def start(message: types.Message):
 @dp.message(F.text == "Назад ⏪")
 async def back(message: types.Message):
     user_states.pop(message.from_user.id, None)
-    await send_clean(message, "🏠 Главное меню", main_menu(), clear=True)
+
+    try:
+        await bot.delete_message(message.chat.id, message.message_id)
+    except:
+        pass
+
+    await send_clean(
+        message,
+        "🏠 Главное меню",
+        main_menu(),
+        clear=True
+    )
 
 
 # ---------------- МАРКЕТ ----------------
@@ -382,15 +393,24 @@ async def handler(message: types.Message):
         await send_clean(message, "Объявление опубликовано", main_menu(), clear=True)
         return
 
-    if state == "conf":
-        if message.photo:
-            await bot.send_photo(
-                CHANNEL_CONFESSIONS,
-                message.photo[-1].file_id,
-                caption=message.caption or ""
-            )
-        else:
-            await bot.send_message(CHANNEL_CONFESSIONS, message.text)
+ if state == "conf":
+    cursor.execute(
+        "SELECT nickname FROM users WHERE id=?",
+        (message.from_user.id,)
+    )
+    nick = cursor.fetchone()[0]
+
+    if message.photo:
+        await bot.send_photo(
+            CHANNEL_CONFESSIONS,
+            message.photo[-1].file_id,
+            caption=(message.caption or "") + f"\n\n🤫 Ник: {nick}"
+        )
+    else:
+        await bot.send_message(
+            CHANNEL_CONFESSIONS,
+            f"{message.text}\n\n🤫 Ник: {nick}"
+        )
 
         await send_clean(message, "Сообщение опубликовано", main_menu(), clear=True)
         return
