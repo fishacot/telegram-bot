@@ -13,7 +13,7 @@ cursor = conn.cursor()
 
 cursor.execute("""CREATE TABLE IF NOT EXISTS users(
 id INTEGER PRIMARY KEY,
-nickname TEXT,
+nickname TEXT UNIQUE,
 rating REAL DEFAULT 0,
 deals INTEGER DEFAULT 0
 )""")
@@ -61,23 +61,18 @@ def back_btn():
         resize_keyboard=True
     )
 
+def chat_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="❌ Закрыть чат")]
+        ],
+        resize_keyboard=True
+    )
+
 async def send_clean(message: types.Message, text, reply_markup=None):
-    try:
-        if message.from_user.id in last_bot_messages:
-            await bot.delete_message(
-                message.chat.id,
-                last_bot_messages[message.from_user.id]
-            )
-    except:
-        pass
-
-    try:
-        await message.delete()
-    except:
-        pass
-
     msg = await message.answer(text, reply_markup=reply_markup)
     last_bot_messages[message.from_user.id] = msg.message_id
+
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -96,13 +91,14 @@ async def start(message: types.Message):
 
     await send_clean(message, "Главное меню", main_menu())
 
+
 @dp.message(F.text == "Назад ⏪")
 async def back(message: types.Message):
     user_states.pop(message.from_user.id, None)
     await send_clean(message, "Главное меню", main_menu())
 
-# МАРКЕТ
 
+# МАРКЕТ
 @dp.message(F.text == "🛒 Маркет объявлений")
 async def market(message: types.Message):
     kb = ReplyKeyboardMarkup(
@@ -119,9 +115,11 @@ async def market(message: types.Message):
 Здесь вы можете опубликовать пост о продаже/покупке любого товара или услуге!
 """, kb)
 
+
 @dp.message(F.text == "🛍️ Перейти в маркет")
 async def go_market(message: types.Message):
     await send_clean(message, MARKET_LINK, main_menu())
+
 
 @dp.message(F.text == "📝 Выставить объявление")
 async def post_market(message: types.Message):
@@ -135,17 +133,18 @@ async def post_market(message: types.Message):
     )
     await send_clean(message, "Выберите тип объявления", kb)
 
+
 @dp.message(F.text.in_(["💵 Выставить пост о продаже","🛒 Выставить пост о покупке"]))
 async def market_text(message: types.Message):
     user_states[message.from_user.id] = "market"
     await send_clean(
         message,
-        "Введите ваше объявление, в конце вашего объявления укажите ваш анонимный никнейм для связи 🤝",
+        "Введите ваше объявление",
         back_btn()
     )
 
-# ПОДСЛУШАНО
 
+# ПОДСЛУШАНО
 @dp.message(F.text == "🕵️ Подслушано")
 async def conf(message: types.Message):
     kb = ReplyKeyboardMarkup(
@@ -159,47 +158,24 @@ async def conf(message: types.Message):
 
     await send_clean(
         message,
-"""Добро пожаловать в «Подслушано»! 
-Мы решили перенести этот легендарный формат в наш анонимный форум! 🤫
-Здесь ты можешь без лишних глаз поделиться самой горячей сплетней или топовой новостью. Твой секрет — наш контент! 👇
+"""Добро пожаловать в «Подслушано»! 🤫
 """,
         kb
     )
 
+
 @dp.message(F.text == "Перейти в подслушано🤫")
 async def go_conf(message: types.Message):
     await send_clean(message, CONF_LINK, main_menu())
+
 
 @dp.message(F.text == "Отправить сообщение ✏️")
 async def send_conf(message: types.Message):
     user_states[message.from_user.id] = "conf"
     await send_clean(message, "Отправьте сообщение", back_btn())
 
-# ПРОФИЛЬ
-
-@dp.message(F.text == "👤 Профиль")
-async def profile(message: types.Message):
-    cursor.execute("SELECT nickname,deals,rating FROM users WHERE id=?",(message.from_user.id,))
-    user = cursor.fetchone()
-
-    await send_clean(
-        message,
-f"""ID: {message.from_user.id}
-Ник: {user[0]}
-Сделок: {user[1]}
-Рейтинг: {user[2]}
-""",
-        back_btn()
-    )
-
-# FAQ
-
-@dp.message(F.text == "FAQ")
-async def faq(message: types.Message):
-    await send_clean(message, FAQ_LINK, main_menu())
 
 # ЛИЧНЫЕ СООБЩЕНИЯ
-
 @dp.message(F.text == "💬 Личные сообщения")
 async def private_menu(message: types.Message):
 
@@ -214,17 +190,16 @@ async def private_menu(message: types.Message):
 
     await send_clean(
         message,
-"""На форуме слишком людно? Введи ник собеседника и продолжи общение в секретном чате.
-Сообщения работают по схеме 
-User A → бот → User B
-Твоя анонимность — под надежной защитой🛡️""",
+"Введите ник пользователя для начала общения",
         kb
     )
+
 
 @dp.message(F.text == "Введите анонимный никнейм пользователя🔎")
 async def find_user(message: types.Message):
     user_states[message.from_user.id] = "find_user"
     await send_clean(message, "Введите ник", back_btn())
+
 
 @dp.message(F.text == "Личные чаты 📂")
 async def chat_list(message: types.Message):
@@ -240,24 +215,36 @@ async def chat_list(message: types.Message):
         await send_clean(message, "Чатов пока нет", back_btn())
         return
 
-    text = "📂 Ваши чаты:\n\n"
+    buttons = []
 
     for r in rows:
         other = r[1] if r[0] == message.from_user.id else r[0]
         cursor.execute("SELECT nickname FROM users WHERE id=?", (other,))
         nick = cursor.fetchone()[0]
-        text += f"• {nick}\n"
+        buttons.append([KeyboardButton(text=f"💬 {nick}")])
 
-    await send_clean(message, text, back_btn())
+    buttons.append([KeyboardButton(text="Назад ⏪")])
+
+    kb = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+    await send_clean(message, "Ваши чаты:", kb)
+
 
 # ОБЩИЙ ХЕНДЛЕР
-
 @dp.message()
 async def handler(message: types.Message):
 
     state = user_states.get(message.from_user.id)
 
     if state == "nickname":
+
+        cursor.execute("SELECT id FROM users WHERE nickname=?", (message.text,))
+        exists = cursor.fetchone()
+
+        if exists:
+            await send_clean(message, "❌ Такой ник уже занят, введите другой")
+            return
+
         cursor.execute(
             "INSERT INTO users(id,nickname) VALUES (?,?)",
             (message.from_user.id, message.text)
@@ -265,6 +252,7 @@ async def handler(message: types.Message):
         conn.commit()
         await send_clean(message, "Ник сохранен", main_menu())
         return
+
 
     if state == "market":
 
@@ -285,6 +273,7 @@ async def handler(message: types.Message):
         await send_clean(message, "Объявление опубликовано", main_menu())
         return
 
+
     if state == "conf":
 
         if message.photo:
@@ -298,6 +287,7 @@ async def handler(message: types.Message):
 
         await send_clean(message, "Сообщение опубликовано", main_menu())
         return
+
 
     if state == "find_user":
 
@@ -318,24 +308,35 @@ async def handler(message: types.Message):
 
         target = user[0]
 
+        if target == message.from_user.id:
+            await send_clean(message, "Нельзя написать самому себе")
+            return
+
         chat_targets[message.from_user.id] = target
         chat_targets[target] = message.from_user.id
 
         cursor.execute(
-            "INSERT INTO chats VALUES (?,?)",
-            (message.from_user.id, target)
+            "SELECT * FROM chats WHERE (user1=? AND user2=?) OR (user1=? AND user2=?)",
+            (message.from_user.id, target, target, message.from_user.id)
         )
-        conn.commit()
+
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO chats VALUES (?,?)",
+                (message.from_user.id, target)
+            )
+            conn.commit()
 
         user_states[message.from_user.id] = "chat"
         user_states[target] = "chat"
 
         await send_clean(
             message,
-            "Чат открыт. Напишите сообщение\n\n❌ Закрыть чат",
-            back_btn()
+            "Чат открыт",
+            chat_keyboard()
         )
         return
+
 
     if state == "chat":
 
