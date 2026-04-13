@@ -9,6 +9,8 @@ from config import *
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+ADMIN_ID = 554529638
+
 conn = sqlite3.connect("database.db")
 cursor = conn.cursor()
 
@@ -26,35 +28,49 @@ user1 INTEGER,
 user2 INTEGER
 )""")
 
+cursor.execute("""CREATE TABLE IF NOT EXISTS admin_texts(
+key TEXT PRIMARY KEY,
+text TEXT
+)""")
+
+cursor.execute("""CREATE TABLE IF NOT EXISTS admin_photos(
+key TEXT PRIMARY KEY,
+file_id TEXT
+)""")
+
+cursor.execute("""CREATE TABLE IF NOT EXISTS admin_messages(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+nickname TEXT,
+text TEXT
+)""")
+
+cursor.execute("""CREATE TABLE IF NOT EXISTS deals(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+nick1 TEXT,
+nick2 TEXT,
+id1 INTEGER,
+id2 INTEGER
+)""")
+
 conn.commit()
 
 # ---------------- STATE ----------------
 
 user_states = {}
 chat_targets = {}
-user_messages = {}
 
 # ---------------- ТАЙМЕРЫ ----------------
 
 market_cooldowns = {}
 conf_cooldowns = {}
 
-COOLDOWN = 9000  # 2.5 часа
+COOLDOWN = 9000
 
 # ---------------- ССЫЛКИ ----------------
 
 MARKET_LINK = "https://t.me/VnykovoAnonMarket"
 CONF_LINK = "https://t.me/podslyshenoVnykovo"
 FAQ_LINK = "https://t.me/abouuttanonvnykovo11"
-
-# ---------------- ТЕКСТЫ ----------------
-
-WELCOME_TEXT = """Приветствуем в самом скрытном уголке района Внуково 🕵️‍♀️
-
-Здесь можно быть кем угодно или не быть никем. Ваш анонимный никнейм это ваше альтер-эго, ваш аккаунт не будет высвечиваться ни при публикации объявлений, ни при участии обсуждения на форумах 🛡️
-
-Впишите свой анонимный никнейм :
-"""
 
 # ---------------- КНОПКИ ----------------
 
@@ -89,35 +105,41 @@ def chat_keyboard():
         resize_keyboard=True
     )
 
-# ---------------- ОЧИСТКА ----------------
-
-async def track_user_message(message: types.Message):
-    user_messages.setdefault(message.from_user.id, [])
-    user_messages[message.from_user.id].append(message.message_id)
-
+# ---------------- ПОЛНАЯ ОЧИСТКА ДО /START ----------------
 
 async def full_clear(message: types.Message):
-    msgs = user_messages.get(message.from_user.id, [])
-    for msg_id in msgs:
-        try:
-            await bot.delete_message(message.chat.id, msg_id)
-        except:
-            pass
-    user_messages[message.from_user.id] = []
+    try:
+        for i in range(message.message_id, message.message_id - 200, -1):
+            try:
+                await bot.delete_message(message.chat.id, i)
+            except:
+                pass
+    except:
+        pass
 
 
 async def show_main_three(message: types.Message):
     await full_clear(message)
 
-    msg1 = await message.answer(WELCOME_TEXT)
-    await track_user_message(msg1)
+    msg1 = await message.answer(
+        get_text("welcome",
+"""Приветствуем в самом скрытном уголке района Внуково 🕵️‍♀️
+
+Здесь можно быть кем угодно или не быть никем. Ваш анонимный никнейм это ваше альтер-эго, ваш аккаунт не будет высвечиваться ни при публикации объявлений, ни при участии обсуждения на форумах 🛡️
+
+Впишите свой анонимный никнейм :
+""")
+    )
 
     msg2 = await message.answer("✅ Ник сохранен")
-    await track_user_message(msg2)
 
-    msg3 = await message.answer("🏠 Главное меню", reply_markup=main_menu())
-    await track_user_message(msg3)
+    msg3 = await message.answer(
+        "🏠 Главное меню",
+        reply_markup=main_menu()
+    )
 
+
+# ---------------- ТАЙМЕРЫ ----------------
 
 def check_market(user_id):
     last = market_cooldowns.get(user_id)
@@ -142,7 +164,23 @@ def check_conf(user_id):
 
     return False, int(COOLDOWN - diff)
 
-# ---------------- START ----------------
+
+def format_time(seconds):
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    return f"{h}ч {m}мин"
+
+
+# ---------------- ТЕКСТЫ ИЗ БД ----------------
+
+def get_text(key, default):
+    cursor.execute(
+        "SELECT text FROM admin_texts WHERE key=?",
+        (key,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else default
+    # ---------------- START ----------------
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -154,12 +192,15 @@ async def start(message: types.Message):
 
         await full_clear(message)
 
-        msg1 = await message.answer(WELCOME_TEXT)
-        await track_user_message(msg1)
+        await message.answer(
+            get_text("welcome",
+"""Приветствуем в самом скрытном уголке района Внуково 🕵️‍♀️
 
-        msg2 = await message.answer("Введите ваш анонимный никнейм")
-        await track_user_message(msg2)
+Здесь можно быть кем угодно или не быть никем. Ваш анонимный никнейм это ваше альтер-эго, ваш аккаунт не будет высвечиваться ни при публикации объявлений, ни при участии обсуждения на форумах 🛡️
 
+Впишите свой анонимный никнейм :
+""")
+        )
         return
 
     await show_main_three(message)
@@ -187,17 +228,25 @@ async def market(message: types.Message):
     )
 
     await full_clear(message)
-    msg = await message.answer(
-        "Добро пожаловать в маркет",
-        reply_markup=kb
+
+    text = get_text(
+        "market",
+"""👋Добро пожаловать в анонимный маркетплейс!
+Здесь вы можете опубликовать пост о продаже/покупке любого товара или услуге!"""
     )
-    await track_user_message(msg)
+
+    cursor.execute("SELECT file_id FROM admin_photos WHERE key='market'")
+    photo = cursor.fetchone()
+
+    if photo:
+        await bot.send_photo(message.chat.id, photo[0], caption=text, reply_markup=kb)
+    else:
+        await message.answer(text, reply_markup=kb)
 
 
 @dp.message(F.text == "🛍️ Перейти в маркет")
 async def go_market(message: types.Message):
-    msg = await message.answer(MARKET_LINK)
-    await track_user_message(msg)
+    await message.answer(MARKET_LINK)
 
 
 @dp.message(F.text == "📝 Выставить объявление")
@@ -212,8 +261,7 @@ async def market_type(message: types.Message):
     )
 
     await full_clear(message)
-    msg = await message.answer("Выберите тип", reply_markup=kb)
-    await track_user_message(msg)
+    await message.answer("Выберите тип объявления", reply_markup=kb)
 
 
 @dp.message(F.text.in_(["💵 Продажа", "🛒 Покупка"]))
@@ -221,11 +269,10 @@ async def market_input(message: types.Message):
     user_states[message.from_user.id] = "market"
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Введите текст объявления (можно фото)",
         reply_markup=back_btn()
     )
-    await track_user_message(msg)
 
 
 # ---------------- ПОДСЛУШАНО ----------------
@@ -242,14 +289,26 @@ async def conf(message: types.Message):
     )
 
     await full_clear(message)
-    msg = await message.answer("Подслушано", reply_markup=kb)
-    await track_user_message(msg)
+
+    text = get_text(
+        "conf",
+"""Добро пожаловать в «Подслушано»!
+Мы решили перенести этот легендарный формат в наш анонимный форум! 🤫
+Здесь ты можешь без лишних глаз поделиться самой горячей сплетней или топовой новостью. Твой секрет — наш контент! 👇"""
+    )
+
+    cursor.execute("SELECT file_id FROM admin_photos WHERE key='conf'")
+    photo = cursor.fetchone()
+
+    if photo:
+        await bot.send_photo(message.chat.id, photo[0], caption=text, reply_markup=kb)
+    else:
+        await message.answer(text, reply_markup=kb)
 
 
 @dp.message(F.text == "Перейти в подслушано🤫")
 async def go_conf(message: types.Message):
-    msg = await message.answer(CONF_LINK)
-    await track_user_message(msg)
+    await message.answer(CONF_LINK)
 
 
 @dp.message(F.text == "Отправить сообщение ✏️")
@@ -257,11 +316,10 @@ async def conf_input(message: types.Message):
     user_states[message.from_user.id] = "conf"
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Введите сообщение",
         reply_markup=back_btn()
     )
-    await track_user_message(msg)
     # ---------------- ПРОФИЛЬ ----------------
 
 @dp.message(F.text == "👤 Профиль")
@@ -272,24 +330,23 @@ async def profile(message: types.Message):
     )
     nick, rating, deals = cursor.fetchone()
 
-    kb = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="✏️ Изменить ник")],
-            [KeyboardButton(text="Назад ⏪")]
-        ],
-        resize_keyboard=True
-    )
-
     await full_clear(message)
-    msg = await message.answer(
+
+    await message.answer(
         f"""👤 Профиль
 
 Ник: {nick}
+ID: {message.from_user.id}
 Рейтинг: {rating}
 Сделок: {deals}""",
-        reply_markup=kb
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="✏️ Изменить ник")],
+                [KeyboardButton(text="Назад ⏪")]
+            ],
+            resize_keyboard=True
+        )
     )
-    await track_user_message(msg)
 
 
 @dp.message(F.text == "✏️ Изменить ник")
@@ -297,11 +354,10 @@ async def change_nick(message: types.Message):
     user_states[message.from_user.id] = "change_nick"
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Введите новый ник",
         reply_markup=back_btn()
     )
-    await track_user_message(msg)
 
 
 # ---------------- РЕЙТИНГ ----------------
@@ -318,8 +374,7 @@ async def rating(message: types.Message):
         text += f"{i}. {row[0]} — {row[1]}\n"
 
     await full_clear(message)
-    msg = await message.answer(text, reply_markup=back_btn())
-    await track_user_message(msg)
+    await message.answer(text, reply_markup=back_btn())
 
 
 # ---------------- FAQ ----------------
@@ -327,22 +382,20 @@ async def rating(message: types.Message):
 @dp.message(F.text == "FAQ")
 async def faq(message: types.Message):
     await full_clear(message)
-    msg = await message.answer(FAQ_LINK, reply_markup=back_btn())
-    await track_user_message(msg)
+    await message.answer(FAQ_LINK, reply_markup=back_btn())
 
 
 # ---------------- СООБЩЕНИЕ АДМИНУ ----------------
 
 @dp.message(F.text == "🚨 Сообщение админу")
-async def admin_message(message: types.Message):
+async def admin_msg(message: types.Message):
     user_states[message.from_user.id] = "admin_msg"
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Введите сообщение для администратора",
         reply_markup=back_btn()
     )
-    await track_user_message(msg)
 
 
 # ---------------- СДЕЛКИ ----------------
@@ -352,11 +405,10 @@ async def deals(message: types.Message):
     user_states[message.from_user.id] = "deal"
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Введите ник пользователя для сделки",
         reply_markup=back_btn()
     )
-    await track_user_message(msg)
 
 
 # ---------------- ЛИЧНЫЕ СООБЩЕНИЯ ----------------
@@ -373,11 +425,10 @@ async def private_menu(message: types.Message):
     )
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Выберите действие",
         reply_markup=kb
     )
-    await track_user_message(msg)
 
 
 @dp.message(F.text == "Введите анонимный никнейм пользователя🔎")
@@ -385,32 +436,184 @@ async def find_user(message: types.Message):
     user_states[message.from_user.id] = "find_user"
 
     await full_clear(message)
-    msg = await message.answer(
+    await message.answer(
         "Введите ник пользователя",
         reply_markup=back_btn()
     )
-    await track_user_message(msg)
-def format_time(seconds):
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    return f"{h}ч {m}мин"
-    # ---------------- ОСНОВНОЙ HANDLER ----------------
+    # ---------------- АДМИН ПАНЕЛЬ ----------------
+
+def admin_menu():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📔 Тексты"), KeyboardButton(text="📸 Фото")],
+            [KeyboardButton(text="🤖 Сообщения админу"), KeyboardButton(text="📕 Заявки")],
+            [KeyboardButton(text="📈 Количество пользователей")],
+            [KeyboardButton(text="👥 Список пользователей")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+
+@dp.message(Command("admin"))
+async def admin_panel(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    await full_clear(message)
+    await message.answer("Админ панель", reply_markup=admin_menu())
+
+
+# ---------------- АДМИН ТЕКСТЫ ----------------
+
+@dp.message(F.text == "📔 Тексты")
+async def admin_texts(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="welcome"), KeyboardButton(text="market")],
+            [KeyboardButton(text="conf"), KeyboardButton(text="profile")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await full_clear(message)
+    await message.answer("Выберите текст", reply_markup=kb)
+
+
+@dp.message(F.text.in_(["welcome", "market", "conf", "profile"]))
+async def choose_text(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    user_states[message.from_user.id] = f"edit_text_{message.text}"
+
+    await full_clear(message)
+    await message.answer(
+        "Введите новый текст",
+        reply_markup=back_btn()
+    )
+
+
+# ---------------- АДМИН ФОТО ----------------
+
+@dp.message(F.text == "📸 Фото")
+async def admin_photo(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="welcome"), KeyboardButton(text="market")],
+            [KeyboardButton(text="conf"), KeyboardButton(text="profile")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await full_clear(message)
+    await message.answer("Куда добавить фото?", reply_markup=kb)
+
+
+@dp.message(F.text.in_(["welcome", "market", "conf", "profile"]))
+async def choose_photo(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    user_states[message.from_user.id] = f"photo_{message.text}"
+
+    await full_clear(message)
+    await message.answer(
+        "Отправьте фото",
+        reply_markup=back_btn()
+    )
+
+
+# ---------------- СООБЩЕНИЯ АДМИНУ ----------------
+
+@dp.message(F.text == "🤖 Сообщения админу")
+async def admin_msgs(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    cursor.execute("SELECT nickname,text FROM admin_messages ORDER BY id DESC LIMIT 20")
+    rows = cursor.fetchall()
+
+    text = "Сообщения:\n\n"
+    for row in rows:
+        text += f"{row[0]}: {row[1]}\n\n"
+
+    await full_clear(message)
+    await message.answer(text, reply_markup=admin_menu())
+
+
+# ---------------- ЗАЯВКИ ----------------
+
+@dp.message(F.text == "📕 Заявки")
+async def admin_deals(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    cursor.execute("SELECT nick1,nick2,id1,id2 FROM deals ORDER BY id DESC LIMIT 20")
+    rows = cursor.fetchall()
+
+    text = ""
+    for r in rows:
+        text += f"{r[0]} хочет заключить сделку с {r[1]}\nID1: {r[2]}\nID2: {r[3]}\n\n"
+
+    await full_clear(message)
+    await message.answer(text if text else "Нет заявок", reply_markup=admin_menu())
+
+
+# ---------------- КОЛИЧЕСТВО ПОЛЬЗОВАТЕЛЕЙ ----------------
+
+@dp.message(F.text == "📈 Количество пользователей")
+async def users_count(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    count = cursor.fetchone()[0]
+
+    await full_clear(message)
+    await message.answer(
+        f"Всего пользователей: {count}",
+        reply_markup=admin_menu()
+    )
+
+
+# ---------------- СПИСОК ПОЛЬЗОВАТЕЛЕЙ ----------------
+
+@dp.message(F.text == "👥 Список пользователей")
+async def users_list(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    user_states[message.from_user.id] = "find_user_admin"
+
+    await full_clear(message)
+    await message.answer(
+        "Введите анонимный ник",
+        reply_markup=back_btn()
+    )
+# ---------------- ОСНОВНОЙ HANDLER ----------------
 
 @dp.message()
 async def handler(message: types.Message):
 
-    await track_user_message(message)
     state = user_states.get(message.from_user.id)
 
-    # регистрация ника
+    # регистрация
     if state == "nickname":
         cursor.execute(
             "SELECT id FROM users WHERE nickname=?",
             (message.text,)
         )
         if cursor.fetchone():
-            msg = await message.answer("❌ Ник занят")
-            await track_user_message(msg)
+            await message.answer("❌ Ник занят")
             return
 
         cursor.execute(
@@ -433,14 +636,11 @@ async def handler(message: types.Message):
         await show_main_three(message)
         return
 
-    # маркет
+    # MARKET
     if state == "market":
         ok, remain = check_market(message.from_user.id)
         if not ok:
-            msg = await message.answer(
-                f"⏳ Подождите {format_time(remain)}"
-            )
-            await track_user_message(msg)
+            await message.answer(f"⏳ Подождите {format_time(remain)}")
             return
 
         cursor.execute(
@@ -459,23 +659,17 @@ async def handler(message: types.Message):
                 caption=text
             )
         else:
-            await bot.send_message(
-                CHANNEL_MARKET,
-                text
-            )
+            await bot.send_message(CHANNEL_MARKET, text)
 
         market_cooldowns[message.from_user.id] = time.time()
         await show_main_three(message)
         return
 
-    # подслушано
+    # CONF
     if state == "conf":
         ok, remain = check_conf(message.from_user.id)
         if not ok:
-            msg = await message.answer(
-                f"⏳ Подождите {format_time(remain)}"
-            )
-            await track_user_message(msg)
+            await message.answer(f"⏳ Подождите {format_time(remain)}")
             return
 
         cursor.execute(
@@ -494,10 +688,7 @@ async def handler(message: types.Message):
                 caption=text
             )
         else:
-            await bot.send_message(
-                CHANNEL_CONFESSIONS,
-                text
-            )
+            await bot.send_message(CHANNEL_CONFESSIONS, text)
 
         conf_cooldowns[message.from_user.id] = time.time()
         await show_main_three(message)
@@ -511,18 +702,11 @@ async def handler(message: types.Message):
         )
         nick = cursor.fetchone()[0]
 
-        text = f"""
-🚨 Сообщение админу
-
-Ник: {nick}
-ID: {message.from_user.id}
-Username: @{message.from_user.username}
-
-Сообщение:
-{message.text}
-"""
-
-        await bot.send_message(ADMIN_ID, text)
+        cursor.execute(
+            "INSERT INTO admin_messages(nickname,text) VALUES (?,?)",
+            (nick, message.text)
+        )
+        conn.commit()
 
         await show_main_three(message)
         return
@@ -541,68 +725,127 @@ Username: @{message.from_user.username}
         )
         row = cursor.fetchone()
 
-        if row:
-            user2 = row[0]
-        else:
-            user2 = "не найден"
+        if not row:
+            await message.answer("Пользователь не найден")
+            return
 
-        text = f"""
-📕 Новая заявка на сделку
+        id2 = row[0]
 
-Участник 1: {nick1}
-Участник 2: {message.text}
+        cursor.execute(
+            "SELECT nickname FROM users WHERE id=?",
+            (id2,)
+        )
+        nick2 = cursor.fetchone()[0]
 
-ID 1: {message.from_user.id}
-ID 2: {user2}
-"""
-
-        await bot.send_message(ADMIN_ID, text)
+        cursor.execute(
+            "INSERT INTO deals(nick1,nick2,id1,id2) VALUES (?,?,?,?)",
+            (nick1, nick2, message.from_user.id, id2)
+        )
+        conn.commit()
 
         await show_main_three(message)
         return
-            # поиск пользователя для личного чата
-    if state == "find_user":
+
+    # поиск пользователя админ
+    if state == "find_user_admin":
         cursor.execute(
-            "SELECT id,nickname FROM users WHERE nickname=?",
+            "SELECT id FROM users WHERE nickname=?",
             (message.text,)
         )
         row = cursor.fetchone()
 
         if not row:
-            msg = await message.answer("❌ Пользователь не найден")
-            await track_user_message(msg)
+            await message.answer("Не найден")
             return
 
-        target_id = row[0]
-        chat_targets[message.from_user.id] = target_id
-        chat_targets[target_id] = message.from_user.id
+        user_id = row[0]
+
+        try:
+            chat = await bot.get_chat(user_id)
+            username = f"@{chat.username}" if chat.username else "нет"
+        except:
+            username = "нет"
+
+        await message.answer(
+            f"Ник: {message.text}\nID: {user_id}\nUsername: {username}"
+        )
+        return
+
+    # редактирование текста
+    if state and state.startswith("edit_text_"):
+        key = state.replace("edit_text_", "")
 
         cursor.execute(
-            "INSERT INTO chats(user1,user2) VALUES (?,?)",
-            (message.from_user.id, target_id)
+            "REPLACE INTO admin_texts(key,text) VALUES (?,?)",
+            (key, message.text)
         )
         conn.commit()
 
-        msg = await message.answer(
-            "💬 Чат открыт",
+        await message.answer("Сохранено")
+        user_states.pop(message.from_user.id)
+        return
+
+    # фото админ
+    if state and state.startswith("photo_"):
+        if not message.photo:
+            await message.answer("Отправьте фото")
+            return
+
+        key = state.replace("photo_", "")
+
+        cursor.execute(
+            "REPLACE INTO admin_photos(key,file_id) VALUES (?,?)",
+            (key, message.photo[-1].file_id)
+        )
+        conn.commit()
+
+        await message.answer("Фото сохранено")
+        user_states.pop(message.from_user.id)
+        return
+        # ---------------- ЛИЧНЫЕ СООБЩЕНИЯ ----------------
+
+@dp.message()
+async def private_chat_handler(message: types.Message):
+
+    state = user_states.get(message.from_user.id)
+
+    # поиск пользователя
+    if state == "find_user":
+        cursor.execute(
+            "SELECT id FROM users WHERE nickname=?",
+            (message.text,)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            await message.answer("❌ Пользователь не найден")
+            return
+
+        target = row[0]
+
+        chat_targets[message.from_user.id] = target
+        chat_targets[target] = message.from_user.id
+
+        user_states[message.from_user.id] = "chat"
+        user_states[target] = "chat"
+
+        await message.answer(
+            "Чат открыт",
             reply_markup=chat_keyboard()
         )
-        await track_user_message(msg)
 
         try:
             await bot.send_message(
-                target_id,
-                "💬 С вами начали анонимный чат",
+                target,
+                "С вами начали анонимный чат",
                 reply_markup=chat_keyboard()
             )
         except:
             pass
 
-        user_states[message.from_user.id] = "chat"
-        user_states[target_id] = "chat"
         return
 
-    # закрытие чата
+    # закрыть чат
     if message.text == "❌ Закрыть чат":
         chat_targets.pop(message.from_user.id, None)
         user_states.pop(message.from_user.id, None)
@@ -613,9 +856,7 @@ ID 2: {user2}
     # пересылка сообщений
     if state == "chat":
         target = chat_targets.get(message.from_user.id)
-
         if not target:
-            await show_main_three(message)
             return
 
         cursor.execute(
@@ -628,15 +869,18 @@ ID 2: {user2}
             await bot.send_photo(
                 target,
                 message.photo[-1].file_id,
-                caption=f"💬 {nick}:\n{message.caption if message.caption else ''}"
+                caption=f"{nick}:\n{message.caption or ''}"
             )
         else:
             await bot.send_message(
                 target,
-                f"💬 {nick}:\n{message.text}"
+                f"{nick}:\n{message.text}"
             )
+
         return
-        # ---------------- ЗАПУСК ----------------
+
+
+# ---------------- ЗАПУСК ----------------
 
 async def main():
     await dp.start_polling(bot)
