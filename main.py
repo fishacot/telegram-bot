@@ -63,11 +63,9 @@ def format_time(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
     return f"{h}ч {m}мин"
-
-
 def main_menu(user_id=None):
     buttons = [
-        [KeyboardButton(text="🛒 Маркет объявлений")],
+        [KeyboardButton(text="🛒 Маркет ")],
         [KeyboardButton(text="🕵️ Подслушано")],
         [KeyboardButton(text="🔒 Сделки через гаранта")],
         [KeyboardButton(text="⭐ Рейтинг")],
@@ -76,9 +74,6 @@ def main_menu(user_id=None):
         [KeyboardButton(text="🚨 Сообщение админу")],
         [KeyboardButton(text="FAQ")]
     ]
-
-    if user_id == ADMIN_ID:
-        buttons.append([KeyboardButton(text="👮 Админ панель")])
 
     return ReplyKeyboardMarkup(
         keyboard=buttons,
@@ -105,14 +100,19 @@ async def track_user_message(message: types.Message):
     user_messages[message.from_user.id].append(message.message_id)
 
 
+# ИСПРАВЛЕННАЯ ОЧИСТКА (оставляет 3 сообщения)
 async def clear_user_messages(message: types.Message):
     msgs = user_messages.get(message.from_user.id, [])
-    for msg_id in msgs:
+
+    to_delete = msgs[:-3]
+
+    for msg_id in to_delete:
         try:
             await bot.delete_message(message.chat.id, msg_id)
         except:
             pass
-    user_messages[message.from_user.id] = []
+
+    user_messages[message.from_user.id] = msgs[-3:]
 
 
 async def send_clean(message: types.Message, text, reply_markup=None, clear=False):
@@ -123,6 +123,7 @@ async def send_clean(message: types.Message, text, reply_markup=None, clear=Fals
     await track_user_message(msg)
 
 
+# СТАРТ С ВОЗВРАТОМ ТЕКСТА
 @dp.message(Command("start"))
 async def start(message: types.Message):
     cursor.execute("SELECT * FROM users WHERE id=?", (message.from_user.id,))
@@ -132,14 +133,15 @@ async def start(message: types.Message):
         user_states[message.from_user.id] = "nickname"
         await send_clean(
             message,
-            "Введите ваш анонимный никнейм"
+            "Приветствуем в анонимном боте Внуково 🕵️‍♂️\n\nВведите ваш анонимный никнейм:",
+            clear=True
         )
         return
 
     await send_clean(
         message,
         "🏠 Главное меню",
-        main_menu(message.from_user.id),
+        main_menu(),
         clear=True
     )
 
@@ -150,12 +152,12 @@ async def back(message: types.Message):
     await send_clean(
         message,
         "🏠 Главное меню",
-        main_menu(message.from_user.id),
+        main_menu(),
         clear=True
     )
     # ---------------- МАРКЕТ ----------------
 
-@dp.message(F.text == "🛒 Маркет объявлений")
+@dp.message(F.text == "🛒 Маркет ")
 async def market(message: types.Message):
     kb = ReplyKeyboardMarkup(
         keyboard=[
@@ -168,8 +170,10 @@ async def market(message: types.Message):
 
     await send_clean(
         message,
-        "👋 Добро пожаловать в анонимный маркетплейс!",
-        kb
+        "👋Добро пожаловать в анонимный маркетплейс!
+Здесь вы можете опубликовать пост о продаже/покупке любого товара или услуге!",
+        kb,
+        clear=True
     )
 
 
@@ -189,13 +193,13 @@ async def post_market(message: types.Message):
         resize_keyboard=True
     )
 
-    await send_clean(message, "Выберите тип объявления", kb)
+    await send_clean(message, "Выберите тип объявления", kb, clear=True)
 
 
 @dp.message(F.text.in_(["💵 Выставить пост о продаже", "🛒 Выставить пост о покупке"]))
 async def market_text(message: types.Message):
     user_states[message.from_user.id] = "market"
-    await send_clean(message, "Введите ваше объявление", back_btn())
+    await send_clean(message, "Введите ваше объявление", back_btn(), clear=True)
 
 
 # ---------------- ПОДСЛУШАНО ----------------
@@ -213,8 +217,133 @@ async def conf(message: types.Message):
 
     await send_clean(
         message,
-        "Добро пожаловать в «Подслушано» 🤫",
-        kb
+        "# ---------------- МАРКЕТ ----------------
+
+@dp.message(F.text == "🛒 Маркет объявлений")
+async def market(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🛍️ Перейти в маркет")],
+            [KeyboardButton(text="📝 Выставить объявление")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(
+        message,
+        "👋 Добро пожаловать в анонимный маркетплейс!",
+        kb,
+        clear=True
+    )
+
+
+@dp.message(F.text == "🛍️ Перейти в маркет")
+async def go_market(message: types.Message):
+    await send_clean(message, MARKET_LINK)
+
+
+@dp.message(F.text == "📝 Выставить объявление")
+async def post_market(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="💵 Выставить пост о продаже")],
+            [KeyboardButton(text="🛒 Выставить пост о покупке")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(message, "Выберите тип объявления", kb, clear=True)
+
+
+@dp.message(F.text.in_(["💵 Выставить пост о продаже", "🛒 Выставить пост о покупке"]))
+async def market_text(message: types.Message):
+    user_states[message.from_user.id] = "market"
+    await send_clean(message, "Введите ваше объявление", back_btn(), clear=True)
+
+
+# ---------------- ПОДСЛУШАНО ----------------
+
+@dp.message(F.text == "🕵️ Подслушано")
+async def conf(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Перейти в подслушано🤫")],
+            [KeyboardButton(text="Отправить сообщение ✏️")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(
+        message,
+        "# ---------------- МАРКЕТ ----------------
+
+@dp.message(F.text == "🛒 Маркет объявлений")
+async def market(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🛍️ Перейти в маркет")],
+            [KeyboardButton(text="📝 Выставить объявление")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(
+        message,
+        "👋 Добро пожаловать в анонимный маркетплейс!",
+        kb,
+        clear=True
+    )
+
+
+@dp.message(F.text == "🛍️ Перейти в маркет")
+async def go_market(message: types.Message):
+    await send_clean(message, MARKET_LINK)
+
+
+@dp.message(F.text == "📝 Выставить объявление")
+async def post_market(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="💵 Выставить пост о продаже")],
+            [KeyboardButton(text="🛒 Выставить пост о покупке")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(message, "Выберите тип объявления", kb, clear=True)
+
+
+@dp.message(F.text.in_(["💵 Выставить пост о продаже", "🛒 Выставить пост о покупке"]))
+async def market_text(message: types.Message):
+    user_states[message.from_user.id] = "market"
+    await send_clean(message, "Введите ваше объявление", back_btn(), clear=True)
+
+
+# ---------------- ПОДСЛУШАНО ----------------
+
+@dp.message(F.text == "🕵️ Подслушано")
+async def conf(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Перейти в подслушано🤫")],
+            [KeyboardButton(text="Отправить сообщение ✏️")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(
+        message,
+        "Добро пожаловать в «Подслушано»! 
+Мы решили перенести этот легендарный формат в наш анонимный форум! 🤫
+Здесь ты можешь без лишних глаз поделиться самой горячей сплетней или топовой новостью. Твой секрет — наш контент! 👇",
+        kb,
+        clear=True
     )
 
 
@@ -226,7 +355,35 @@ async def go_conf(message: types.Message):
 @dp.message(F.text == "Отправить сообщение ✏️")
 async def send_conf(message: types.Message):
     user_states[message.from_user.id] = "conf"
-    await send_clean(message, "Отправьте сообщение", back_btn())
+    await send_clean(message, "Отправьте сообщение", back_btn(), clear=True)",
+        kb,
+        clear=True
+    )
+
+
+@dp.message(F.text == "Перейти в подслушано🤫")
+async def go_conf(message: types.Message):
+    await send_clean(message, CONF_LINK)
+
+
+@dp.message(F.text == "Отправить сообщение ✏️")
+async def send_conf(message: types.Message):
+    user_states[message.from_user.id] = "conf"
+    await send_clean(message, "Отправьте сообщение", back_btn(), clear=True)",
+        kb,
+        clear=True
+    )
+
+
+@dp.message(F.text == "Перейти в подслушано🤫")
+async def go_conf(message: types.Message):
+    await send_clean(message, CONF_LINK)
+
+
+@dp.message(F.text == "Отправить сообщение ✏️")
+async def send_conf(message: types.Message):
+    user_states[message.from_user.id] = "conf"
+    await send_clean(message, "Отправьте сообщение", back_btn(), clear=True)
     # ---------------- ПРОФИЛЬ ----------------
 
 @dp.message(F.text == "👤 Профиль")
@@ -252,14 +409,15 @@ async def profile(message: types.Message):
 Ник: {nick}
 Рейтинг: {rating}
 Сделок: {deals}""",
-        kb
+        kb,
+        clear=True
     )
 
 
 @dp.message(F.text == "✏️ Изменить ник")
 async def change_nick(message: types.Message):
     user_states[message.from_user.id] = "change_nick"
-    await send_clean(message, "Введите новый ник", back_btn())
+    await send_clean(message, "Введите новый ник", back_btn(), clear=True)
 
 
 # ---------------- РЕЙТИНГ ----------------
@@ -275,14 +433,14 @@ async def rating(message: types.Message):
     for i, row in enumerate(rows, start=1):
         text += f"{i}. {row[0]} — {row[1]}\n"
 
-    await send_clean(message, text, back_btn())
+    await send_clean(message, text, back_btn(), clear=True)
 
 
 # ---------------- FAQ ----------------
 
 @dp.message(F.text == "FAQ")
 async def faq(message: types.Message):
-    await send_clean(message, FAQ_LINK, back_btn())
+    await send_clean(message, FAQ_LINK, back_btn(), clear=True)
 
 
 # ---------------- СДЕЛКИ ----------------
@@ -292,8 +450,12 @@ async def deals_menu(message: types.Message):
     await send_clean(
         message,
         "Раздел сделок через гаранта находится в разработке",
-        back_btn()
-    )# ---------------- ЛИЧНЫЕ СООБЩЕНИЯ ----------------
+        back_btn(),
+        clear=True
+    )
+
+
+# ---------------- ЛИЧНЫЕ СООБЩЕНИЯ ----------------
 
 @dp.message(F.text == "💬 Личные сообщения")
 async def private_menu(message: types.Message):
@@ -309,14 +471,15 @@ async def private_menu(message: types.Message):
     await send_clean(
         message,
         "Введите ник пользователя для начала общения",
-        kb
+        kb,
+        clear=True
     )
 
 
 @dp.message(F.text == "Введите анонимный никнейм пользователя🔎")
 async def find_user(message: types.Message):
     user_states[message.from_user.id] = "find_user"
-    await send_clean(message, "Введите ник", back_btn())
+    await send_clean(message, "Введите ник", back_btn(), clear=True)
 
 
 @dp.message(F.text == "Личные чаты 📂")
@@ -329,7 +492,7 @@ async def chat_list(message: types.Message):
     rows = cursor.fetchall()
 
     if not rows:
-        await send_clean(message, "Чатов пока нет", back_btn())
+        await send_clean(message, "Чатов пока нет", back_btn(), clear=True)
         return
 
     buttons = []
@@ -344,66 +507,7 @@ async def chat_list(message: types.Message):
 
     kb = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
-    await send_clean(message, "Ваши чаты:", kb)
-
-
-# ---------------- АДМИН ПАНЕЛЬ ----------------
-
-@dp.message(F.text == "👮 Админ панель")
-async def admin_panel(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    kb = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📊 Статистика")],
-            [KeyboardButton(text="📢 Рассылка")],
-            [KeyboardButton(text="🧹 Очистить кд")],
-            [KeyboardButton(text="Назад ⏪")]
-        ],
-        resize_keyboard=True
-    )
-
-    await send_clean(message, "Админ панель", kb)
-
-
-@dp.message(F.text == "📊 Статистика")
-async def admin_stats(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    cursor.execute("SELECT COUNT(*) FROM users")
-    users = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM chats")
-    chats = cursor.fetchone()[0]
-
-    await send_clean(
-        message,
-        f"""📊 Статистика
-
-Пользователей: {users}
-Чатов: {chats}""",
-        back_btn()
-    )
-
-
-@dp.message(F.text == "📢 Рассылка")
-async def admin_broadcast(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    user_states[message.from_user.id] = "broadcast"
-    await send_clean(message, "Введите текст рассылки", back_btn())
-
-
-@dp.message(F.text == "🧹 Очистить кд")
-async def admin_clear_cd(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-
-    post_cooldowns.clear()
-    await send_clean(message, "Кулдауны очищены", back_btn())
+    await send_clean(message, "Ваши чаты:", kb, clear=True)
     # ---------------- ГЛАВНЫЙ HANDLER ----------------
 
 @dp.message()
@@ -423,22 +527,7 @@ async def handler(message: types.Message):
         await send_clean(
             message,
             "Ник изменен",
-            main_menu(message.from_user.id),
-            clear=True
-        )
-        return
-
-    # ---------- сообщение админу ----------
-    if state == "admin":
-        await bot.send_message(
-            ADMIN_ID,
-            f"Сообщение от {message.from_user.id}:\n{message.text}"
-        )
-
-        await send_clean(
-            message,
-            "Сообщение отправлено",
-            main_menu(message.from_user.id),
+            main_menu(),
             clear=True
         )
         return
@@ -464,23 +553,9 @@ async def handler(message: types.Message):
         await send_clean(
             message,
             "Ник сохранен",
-            main_menu(message.from_user.id),
+            main_menu(),
             clear=True
         )
-        return
-
-    # ---------- рассылка ----------
-    if state == "broadcast" and message.from_user.id == ADMIN_ID:
-        cursor.execute("SELECT id FROM users")
-        users = cursor.fetchall()
-
-        for u in users:
-            try:
-                await bot.send_message(u[0], message.text)
-            except:
-                pass
-
-        await send_clean(message, "Рассылка отправлена", back_btn())
         return
 
     # ---------- MARKET ----------
@@ -491,7 +566,8 @@ async def handler(message: types.Message):
             await send_clean(
                 message,
                 f"⏳ Публиковать можно раз в 2.5 часа\nОсталось: {format_time(remain)}",
-                back_btn()
+                back_btn(),
+                clear=True
             )
             return
 
@@ -518,7 +594,7 @@ async def handler(message: types.Message):
         await send_clean(
             message,
             "Объявление опубликовано",
-            main_menu(message.from_user.id),
+            main_menu(),
             clear=True
         )
         return
@@ -531,7 +607,8 @@ async def handler(message: types.Message):
             await send_clean(
                 message,
                 f"⏳ Публиковать можно раз в 2.5 часа\nОсталось: {format_time(remain)}",
-                back_btn()
+                back_btn(),
+                clear=True
             )
             return
 
@@ -558,7 +635,7 @@ async def handler(message: types.Message):
         await send_clean(
             message,
             "Сообщение опубликовано",
-            main_menu(message.from_user.id),
+            main_menu(),
             clear=True
         )
         return
@@ -573,7 +650,7 @@ async def handler(message: types.Message):
         user = cursor.fetchone()
 
         if not user:
-            await send_clean(message, "Пользователь не найден", back_btn())
+            await send_clean(message, "Пользователь не найден", back_btn(), clear=True)
             return
 
         target = user[0]
@@ -616,7 +693,7 @@ async def handler(message: types.Message):
             await send_clean(
                 message,
                 "Чат закрыт",
-                main_menu(message.from_user.id),
+                main_menu(),
                 clear=True
             )
             return
