@@ -37,7 +37,6 @@ user_states = {}
 chat_targets = {}
 user_messages = {}
 
-# таймер публикаций
 post_cooldowns = {}
 COOLDOWN = 9000
 
@@ -66,18 +65,23 @@ def format_time(seconds):
     return f"{h}ч {m}мин"
 
 
-def main_menu():
+def main_menu(user_id=None):
+    buttons = [
+        [KeyboardButton(text="🛒 Маркет объявлений")],
+        [KeyboardButton(text="🕵️ Подслушано")],
+        [KeyboardButton(text="🔒 Сделки через гаранта")],
+        [KeyboardButton(text="⭐ Рейтинг")],
+        [KeyboardButton(text="💬 Личные сообщения")],
+        [KeyboardButton(text="👤 Профиль")],
+        [KeyboardButton(text="🚨 Сообщение админу")],
+        [KeyboardButton(text="FAQ")]
+    ]
+
+    if user_id == ADMIN_ID:
+        buttons.append([KeyboardButton(text="👮 Админ панель")])
+
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🛒 Маркет объявлений")],
-            [KeyboardButton(text="🕵️ Подслушано")],
-            [KeyboardButton(text="🔒 Сделки через гаранта")],
-            [KeyboardButton(text="⭐ Рейтинг")],
-            [KeyboardButton(text="💬 Личные сообщения")],
-            [KeyboardButton(text="👤 Профиль")],
-            [KeyboardButton(text="🚨 Сообщение админу")],
-            [KeyboardButton(text="FAQ")]
-        ],
+        keyboard=buttons,
         resize_keyboard=True
     )
 
@@ -128,23 +132,28 @@ async def start(message: types.Message):
         user_states[message.from_user.id] = "nickname"
         await send_clean(
             message,
-            """Приветствуем в самом скрытном уголке района Внуково 🕵️‍♀️
-Здесь можно быть кем угодно или не быть никем. Ваш анонимный никнейм это ваше альтер-эго.
-Впишите свой анонимный никнейм :
-"""
+            "Введите ваш анонимный никнейм"
         )
         return
 
-    await send_clean(message, "🏠 Главное меню", main_menu(), clear=True)
+    await send_clean(
+        message,
+        "🏠 Главное меню",
+        main_menu(message.from_user.id),
+        clear=True
+    )
 
 
 @dp.message(F.text == "Назад ⏪")
 async def back(message: types.Message):
     user_states.pop(message.from_user.id, None)
-    await send_clean(message, "🏠 Главное меню", main_menu(), clear=True)
-
-
-# ---------------- МАРКЕТ ----------------
+    await send_clean(
+        message,
+        "🏠 Главное меню",
+        main_menu(message.from_user.id),
+        clear=True
+    )
+    # ---------------- МАРКЕТ ----------------
 
 @dp.message(F.text == "🛒 Маркет объявлений")
 async def market(message: types.Message):
@@ -167,7 +176,9 @@ async def market(message: types.Message):
 @dp.message(F.text == "🛍️ Перейти в маркет")
 async def go_market(message: types.Message):
     await send_clean(message, MARKET_LINK)
-    @dp.message(F.text == "📝 Выставить объявление")
+
+
+@dp.message(F.text == "📝 Выставить объявление")
 async def post_market(message: types.Message):
     kb = ReplyKeyboardMarkup(
         keyboard=[
@@ -177,6 +188,7 @@ async def post_market(message: types.Message):
         ],
         resize_keyboard=True
     )
+
     await send_clean(message, "Выберите тип объявления", kb)
 
 
@@ -215,13 +227,14 @@ async def go_conf(message: types.Message):
 async def send_conf(message: types.Message):
     user_states[message.from_user.id] = "conf"
     await send_clean(message, "Отправьте сообщение", back_btn())
-
-
-# ---------------- ПРОФИЛЬ ----------------
+    # ---------------- ПРОФИЛЬ ----------------
 
 @dp.message(F.text == "👤 Профиль")
 async def profile(message: types.Message):
-    cursor.execute("SELECT nickname,rating,deals FROM users WHERE id=?", (message.from_user.id,))
+    cursor.execute(
+        "SELECT nickname,rating,deals FROM users WHERE id=?",
+        (message.from_user.id,)
+    )
     nick, rating, deals = cursor.fetchone()
 
     kb = ReplyKeyboardMarkup(
@@ -253,7 +266,9 @@ async def change_nick(message: types.Message):
 
 @dp.message(F.text == "⭐ Рейтинг")
 async def rating(message: types.Message):
-    cursor.execute("SELECT nickname,rating FROM users ORDER BY rating DESC LIMIT 10")
+    cursor.execute(
+        "SELECT nickname,rating FROM users ORDER BY rating DESC LIMIT 10"
+    )
     rows = cursor.fetchall()
 
     text = "⭐ Рейтинг пользователей\n\n"
@@ -261,19 +276,13 @@ async def rating(message: types.Message):
         text += f"{i}. {row[0]} — {row[1]}\n"
 
     await send_clean(message, text, back_btn())
-    # ---------------- FAQ ----------------
+
+
+# ---------------- FAQ ----------------
 
 @dp.message(F.text == "FAQ")
 async def faq(message: types.Message):
     await send_clean(message, FAQ_LINK, back_btn())
-
-
-# ---------------- АДМИН ----------------
-
-@dp.message(F.text == "🚨 Сообщение админу")
-async def admin(message: types.Message):
-    user_states[message.from_user.id] = "admin"
-    await send_clean(message, "Введите сообщение для администратора", back_btn())
 
 
 # ---------------- СДЕЛКИ ----------------
@@ -284,10 +293,7 @@ async def deals_menu(message: types.Message):
         message,
         "Раздел сделок через гаранта находится в разработке",
         back_btn()
-    )
-
-
-# ---------------- ЛИЧНЫЕ СООБЩЕНИЯ ----------------
+    )# ---------------- ЛИЧНЫЕ СООБЩЕНИЯ ----------------
 
 @dp.message(F.text == "💬 Личные сообщения")
 async def private_menu(message: types.Message):
@@ -339,35 +345,114 @@ async def chat_list(message: types.Message):
     kb = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
     await send_clean(message, "Ваши чаты:", kb)
-    @dp.message()
+
+
+# ---------------- АДМИН ПАНЕЛЬ ----------------
+
+@dp.message(F.text == "👮 Админ панель")
+async def admin_panel(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📊 Статистика")],
+            [KeyboardButton(text="📢 Рассылка")],
+            [KeyboardButton(text="🧹 Очистить кд")],
+            [KeyboardButton(text="Назад ⏪")]
+        ],
+        resize_keyboard=True
+    )
+
+    await send_clean(message, "Админ панель", kb)
+
+
+@dp.message(F.text == "📊 Статистика")
+async def admin_stats(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    users = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM chats")
+    chats = cursor.fetchone()[0]
+
+    await send_clean(
+        message,
+        f"""📊 Статистика
+
+Пользователей: {users}
+Чатов: {chats}""",
+        back_btn()
+    )
+
+
+@dp.message(F.text == "📢 Рассылка")
+async def admin_broadcast(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    user_states[message.from_user.id] = "broadcast"
+    await send_clean(message, "Введите текст рассылки", back_btn())
+
+
+@dp.message(F.text == "🧹 Очистить кд")
+async def admin_clear_cd(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    post_cooldowns.clear()
+    await send_clean(message, "Кулдауны очищены", back_btn())
+    # ---------------- ГЛАВНЫЙ HANDLER ----------------
+
+@dp.message()
 async def handler(message: types.Message):
 
     await track_user_message(message)
     state = user_states.get(message.from_user.id)
 
+    # ---------- смена ника ----------
     if state == "change_nick":
-        cursor.execute("UPDATE users SET nickname=? WHERE id=?",
-                       (message.text, message.from_user.id))
+        cursor.execute(
+            "UPDATE users SET nickname=? WHERE id=?",
+            (message.text, message.from_user.id)
+        )
         conn.commit()
 
-        await send_clean(message, "Ник изменен", main_menu(), clear=True)
+        await send_clean(
+            message,
+            "Ник изменен",
+            main_menu(message.from_user.id),
+            clear=True
+        )
         return
 
+    # ---------- сообщение админу ----------
     if state == "admin":
         await bot.send_message(
             ADMIN_ID,
             f"Сообщение от {message.from_user.id}:\n{message.text}"
         )
 
-        await send_clean(message, "Сообщение отправлено", main_menu(), clear=True)
+        await send_clean(
+            message,
+            "Сообщение отправлено",
+            main_menu(message.from_user.id),
+            clear=True
+        )
         return
 
+    # ---------- регистрация ----------
     if state == "nickname":
-        cursor.execute("SELECT id FROM users WHERE nickname=?", (message.text,))
+        cursor.execute(
+            "SELECT id FROM users WHERE nickname=?",
+            (message.text,)
+        )
         exists = cursor.fetchone()
 
         if exists:
-            await send_clean(message, "❌ Такой ник уже занят, введите другой")
+            await send_clean(message, "❌ Такой ник уже занят")
             return
 
         cursor.execute(
@@ -376,10 +461,29 @@ async def handler(message: types.Message):
         )
         conn.commit()
 
-        await send_clean(message, "Ник сохранен", main_menu(), clear=True)
+        await send_clean(
+            message,
+            "Ник сохранен",
+            main_menu(message.from_user.id),
+            clear=True
+        )
         return
 
-    # ---------- MARKET С ТАЙМЕРОМ ----------
+    # ---------- рассылка ----------
+    if state == "broadcast" and message.from_user.id == ADMIN_ID:
+        cursor.execute("SELECT id FROM users")
+        users = cursor.fetchall()
+
+        for u in users:
+            try:
+                await bot.send_message(u[0], message.text)
+            except:
+                pass
+
+        await send_clean(message, "Рассылка отправлена", back_btn())
+        return
+
+    # ---------- MARKET ----------
     if state == "market":
 
         ok, remain = check_cooldown(message.from_user.id)
@@ -391,7 +495,10 @@ async def handler(message: types.Message):
             )
             return
 
-        cursor.execute("SELECT nickname FROM users WHERE id=?", (message.from_user.id,))
+        cursor.execute(
+            "SELECT nickname FROM users WHERE id=?",
+            (message.from_user.id,)
+        )
         nick = cursor.fetchone()[0]
 
         content = message.text if message.text else message.caption
@@ -408,10 +515,15 @@ async def handler(message: types.Message):
 
         post_cooldowns[message.from_user.id] = time.time()
 
-        await send_clean(message, "Объявление опубликовано", main_menu(), clear=True)
+        await send_clean(
+            message,
+            "Объявление опубликовано",
+            main_menu(message.from_user.id),
+            clear=True
+        )
         return
 
-    # ---------- CONF С ТАЙМЕРОМ ----------
+    # ---------- CONF ----------
     if state == "conf":
 
         ok, remain = check_cooldown(message.from_user.id)
@@ -423,7 +535,10 @@ async def handler(message: types.Message):
             )
             return
 
-        cursor.execute("SELECT nickname FROM users WHERE id=?", (message.from_user.id,))
+        cursor.execute(
+            "SELECT nickname FROM users WHERE id=?",
+            (message.from_user.id,)
+        )
         nick = cursor.fetchone()[0]
 
         content = message.text if message.text else message.caption
@@ -440,20 +555,25 @@ async def handler(message: types.Message):
 
         post_cooldowns[message.from_user.id] = time.time()
 
-        await send_clean(message, "Сообщение опубликовано", main_menu(), clear=True)
+        await send_clean(
+            message,
+            "Сообщение опубликовано",
+            main_menu(message.from_user.id),
+            clear=True
+        )
         return
 
     # ---------- поиск пользователя ----------
     if state == "find_user":
+
         cursor.execute(
             "SELECT id FROM users WHERE nickname=?",
             (message.text,)
         )
-
         user = cursor.fetchone()
 
         if not user:
-            await send_clean(message, "🤷 пользователь не найден ❌", back_btn())
+            await send_clean(message, "Пользователь не найден", back_btn())
             return
 
         target = user[0]
@@ -490,9 +610,15 @@ async def handler(message: types.Message):
 
     # ---------- чат ----------
     if state == "chat":
+
         if message.text == "❌ Закрыть чат":
             user_states.pop(message.from_user.id, None)
-            await send_clean(message, "Чат закрыт", main_menu(), clear=True)
+            await send_clean(
+                message,
+                "Чат закрыт",
+                main_menu(message.from_user.id),
+                clear=True
+            )
             return
 
         target = chat_targets.get(message.from_user.id)
@@ -507,10 +633,11 @@ async def handler(message: types.Message):
         nick = cursor.fetchone()[0]
 
         text = f"💬 {nick}:\n{message.text}"
-
         await bot.send_message(target, text)
         return
 
+
+# ---------------- ЗАПУСК ----------------
 
 async def main():
     await dp.start_polling(bot)
