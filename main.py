@@ -470,9 +470,15 @@ async def main_handler(message: types.Message):
         )
         await track_user_message(msg)
         return
-        async def main():
+
+# ================= ЗАПУСК =================
+
+async def main():
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+
