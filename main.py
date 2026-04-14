@@ -21,6 +21,8 @@ from config import (
     CHANNEL_CHAT
 )
 
+CHANNEL_INFO = CHANNEL_CHAT
+
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
