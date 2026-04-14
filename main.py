@@ -805,6 +805,10 @@ async def handle_admin_search(message: types.Message):
 # СКАЧАТЬ CSV
 # ==============================
 
+# ==============================
+# СКАЧАТЬ CSV
+# ==============================
+
 @dp.message(F.text == "📁 Скачать CSV")
 async def download_csv(message: types.Message):
 
@@ -822,11 +826,7 @@ async def download_csv(message: types.Message):
     )
 
 
-async def handle_register(message: types.Message):
-    ...
-    
-
-    # ==============================
+# ==============================
 # ГЛАВНЫЙ HANDLER
 # ==============================
 
@@ -835,9 +835,10 @@ async def main_handler(message: types.Message):
 
     uid = message.from_user.id
     state = user_states.get(uid)
-        # регистрация ника
+
+    # регистрация ника
     if state == STATE_REGISTER:
-        await handle_register(message)
+        await handle_nick(message)
         return
 
     # маркет
@@ -878,16 +879,6 @@ async def main_handler(message: types.Message):
     # поиск админ
     if state == STATE_ADMIN_SEARCH:
         await handle_admin_search(message)
-        return
-
-    # редактор текстов
-    if state and state.startswith("edit_text_"):
-        await handle_text_save(message)
-        return
-
-    # редактор фото
-    if state and state.startswith("edit_photo_"):
-        await handle_photo_save(message)
         return
 
 
