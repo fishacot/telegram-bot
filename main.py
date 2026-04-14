@@ -820,7 +820,12 @@ async def download_csv(message: types.Message):
         message.from_user.id,
         types.FSInputFile("users.csv")
     )
-  async def handle_register(message: types.Message):
+
+
+async def handle_register(message: types.Message):
+    ...
+    
+
     # ==============================
 # ГЛАВНЫЙ HANDLER
 # ==============================
