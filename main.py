@@ -25,6 +25,7 @@ dp = Dispatcher()
 # ==============================
 
 STATE_WAIT_NICK = "wait_nick"
+STATE_REGISTER = "register"
 STATE_MARKET = "market"
 STATE_CONF = "conf"
 STATE_DM_SEARCH = "dm_search"
@@ -190,16 +191,12 @@ async def back_handler(message: types.Message):
 async def start(message: types.Message):
 
     uid = message.from_user.id
-
-    user_states[uid] = STATE_WAIT_NICK
+    user_states[uid] = STATE_REGISTER
 
     await full_cleanup(message)
 
     msg = await message.answer("Введите анонимный ник:")
-    start_messages[uid] = [msg.message_id]
-
     await track_message(msg)
-
 
 # ==============================
 # РЕГИСТРАЦИЯ НИКА
@@ -823,6 +820,7 @@ async def download_csv(message: types.Message):
         message.from_user.id,
         types.FSInputFile("users.csv")
     )
+  async def handle_register(message: types.Message):
     # ==============================
 # ГЛАВНЫЙ HANDLER
 # ==============================
@@ -832,6 +830,10 @@ async def main_handler(message: types.Message):
 
     uid = message.from_user.id
     state = user_states.get(uid)
+        # регистрация ника
+    if state == STATE_REGISTER:
+        await handle_register(message)
+        return
 
     # маркет
     if state == STATE_MARKET:
