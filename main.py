@@ -18,8 +18,7 @@ from config import (
     ADMIN_ID,
     CHANNEL_MARKET,
     CHANNEL_CONFESSIONS,
-    CHANNEL_CHAT,
-    CHANNEL_INFO
+    CHANNEL_CHAT
 )
 
 bot = Bot(token=TOKEN)
