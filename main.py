@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from config import *
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=8734934956:AAFM9DunvR8CMMdqiklqGoklSJ825izn1nk)
 dp = Dispatcher()
 
 ADMIN_ID = 554529638
