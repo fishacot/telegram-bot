@@ -384,7 +384,7 @@ async def rating(message: types.Message):
 # FAQ
 # ==============================
 
-INFO_CHANNEL_LINK = "https://t.me/ВАШ_INFO_КАНАЛ"
+INFO_CHANNEL_LINK = "https://t.me/abouuttanonvnykovo11"
 
 
 @dp.message(F.text == "FAQ")
